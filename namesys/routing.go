@@ -2,6 +2,8 @@ package namesys
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	proto "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/gogo/protobuf/proto"
 	mh "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-multihash"
@@ -19,25 +21,49 @@ var log = logging.Logger("namesys")
 // routingResolver implements NSResolver for the main IPFS SFS-like naming
 type routingResolver struct {
 	routing routing.IpfsRouting
+
+	cache     map[string]cacheEntry
+	cachelock sync.Mutex
+}
+
+func (r *routingResolver) cacheGet(name string) (path.Path, bool) {
+	r.cachelock.Lock()
+	entry, ok := r.cache[name]
+	r.cachelock.Unlock()
+	if ok && time.Now().Sub(entry.recvd) < IpnsCacheLife {
+		return entry.val, true
+	}
+
+	return "", false
+}
+
+func (r *routingResolver) cacheSet(name string, val path.Path) {
+	r.cachelock.Lock()
+	r.cache[name] = cacheEntry{
+		val:   val,
+		recvd: time.Now(),
+	}
+	r.cachelock.Unlock()
+}
+
+var IpnsCacheLife = time.Minute
+
+type cacheEntry struct {
+	val   path.Path
+	recvd time.Time
 }
 
 // NewRoutingResolver constructs a name resolver using the IPFS Routing system
 // to implement SFS-like naming on top.
-func NewRoutingResolver(route routing.IpfsRouting) Resolver {
+func NewRoutingResolver(route routing.IpfsRouting) *routingResolver {
 	if route == nil {
 		panic("attempt to create resolver with nil routing system")
 	}
 
-	return &routingResolver{routing: route}
-}
-
-// newRoutingResolver returns a resolver instead of a Resolver.
-func newRoutingResolver(route routing.IpfsRouting) resolver {
-	if route == nil {
-		panic("attempt to create resolver with nil routing system")
+	return &routingResolver{
+		routing: route,
+		cache:   make(map[string]cacheEntry),
 	}
-
-	return &routingResolver{routing: route}
 }
 
 // Resolve implements Resolver.
@@ -54,6 +80,11 @@ func (r *routingResolver) ResolveN(ctx context.Context, name string, depth int) 
 // resolve SFS-like names.
 func (r *routingResolver) resolveOnce(ctx context.Context, name string) (path.Path, error) {
 	log.Debugf("RoutingResolve: '%s'", name)
+	cached, ok := r.cacheGet(name)
+	if ok {
+		return cached, nil
+	}
+
 	hash, err := mh.FromB58String(name)
 	if err != nil {
 		log.Warning("RoutingResolve: bad input hash: [%s]\n", name)
@@ -98,10 +129,17 @@ func (r *routingResolver) resolveOnce(ctx context.Context, name string) (path.Pa
 	valh, err := mh.Cast(entry.GetValue())
 	if err != nil {
 		// Not a multihash, probably a new record
-		return path.ParsePath(string(entry.GetValue()))
+		p, err := path.ParsePath(string(entry.GetValue()))
+		if err != nil {
+			return "", err
+		}
+		r.cacheSet(name, p)
+		return p, nil
 	} else {
 		// Its an old style multihash record
 		log.Warning("Detected old style multihash record")
-		return path.FromKey(key.Key(valh)), nil
+		p := path.FromKey(key.Key(valh))
+		r.cacheSet(name, p)
+		return p, nil
 	}
 }

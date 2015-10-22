@@ -62,9 +62,11 @@ Resolve the value of another name:
 			}
 		}
 
-		router := n.Routing
+		var resolver namesys.Resolver
+		resolver = n.Namesys
 		if local, _, _ := req.Option("local").Bool(); local {
-			router = offline.NewOfflineRouter(n.Repo.Datastore(), n.PrivateKey)
+			offroute := offline.NewOfflineRouter(n.Repo.Datastore(), n.PrivateKey)
+			resolver = namesys.NewRoutingResolver(offroute)
 		}
 
 		var name string
@@ -86,7 +88,10 @@ Resolve the value of another name:
 			depth = namesys.DefaultDepthLimit
 		}
 
-		resolver := namesys.NewRoutingResolver(router)
+		if !strings.HasPrefix(name, "/ipns/") {
+			name = "/ipns/" + name
+		}
+
 		output, err := resolver.ResolveN(req.Context(), name, depth)
 		if err != nil {
 			res.SetError(err, cmds.ErrNormal)

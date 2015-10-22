@@ -84,7 +84,7 @@ func (dht *IpfsDHT) GetValue(ctx context.Context, key key.Key) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	vals, err := dht.GetValues(ctx, key, 16)
+	vals, err := dht.GetValues(ctx, key, (KValue/2)+1)
 	if err != nil {
 		return nil, err
 	}

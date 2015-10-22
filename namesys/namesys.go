@@ -31,7 +31,7 @@ func NewNameSystem(r routing.IpfsRouting, ds ds.Datastore) NameSystem {
 		resolvers: map[string]resolver{
 			"dns":      newDNSResolver(),
 			"proquint": new(ProquintResolver),
-			"dht":      newRoutingResolver(r),
+			"dht":      NewRoutingResolver(r),
 		},
 		publishers: map[string]Publisher{
 			"/ipns/": NewRoutingPublisher(r, ds),

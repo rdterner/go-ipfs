@@ -18,6 +18,9 @@ import (
 )
 
 func TestRepublish(t *testing.T) {
+	// set cache life to zero for testing low-period repubs
+	namesys.IpnsCacheLife = 0
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
