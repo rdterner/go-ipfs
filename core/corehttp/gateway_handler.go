@@ -54,22 +54,34 @@ func (i *gatewayHandler) newDagFromReader(r io.Reader) (*dag.Node, error) {
 
 // TODO(btc): break this apart into separate handlers using a more expressive muxer
 func (i *gatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	ctx, cancel := context.WithCancel(i.node.Context())
+
+	notifier, ok := w.(http.CloseNotifier)
+	if ok {
+		go func() {
+			<-notifier.CloseNotify()
+			// TODO(cryptix): log?
+			cancel()
+		}()
+	}
+
 	if i.config.Writable {
 		switch r.Method {
 		case "POST":
-			i.postHandler(w, r)
+			i.postHandler(ctx, w, r)
 			return
 		case "PUT":
-			i.putHandler(w, r)
+			i.putHandler(ctx, w, r)
 			return
 		case "DELETE":
-			i.deleteHandler(w, r)
+			i.deleteHandler(ctx, w, r)
 			return
 		}
 	}
 
 	if r.Method == "GET" || r.Method == "HEAD" {
-		i.getOrHeadHandler(w, r)
+		i.getOrHeadHandler(ctx, w, r)
 		return
 	}
 
@@ -85,9 +97,7 @@ func (i *gatewayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Error(errmsg) // TODO(cryptix): log errors until we have a better way to expose these (counter metrics maybe)
 }
 
-func (i *gatewayHandler) getOrHeadHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(i.node.Context())
-	defer cancel()
+func (i *gatewayHandler) getOrHeadHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	urlPath := r.URL.Path
 
@@ -255,7 +265,7 @@ func (i *gatewayHandler) getOrHeadHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (i *gatewayHandler) postHandler(w http.ResponseWriter, r *http.Request) {
+func (i *gatewayHandler) postHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	nd, err := i.newDagFromReader(r.Body)
 	if err != nil {
 		internalWebError(w, err)
@@ -385,10 +395,8 @@ func (i *gatewayHandler) putHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, ipfsPathPrefix+key.String()+"/"+strings.Join(components, "/"), http.StatusCreated)
 }
 
-func (i *gatewayHandler) deleteHandler(w http.ResponseWriter, r *http.Request) {
+func (i *gatewayHandler) deleteHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	urlPath := r.URL.Path
-	ctx, cancel := context.WithCancel(i.node.Context())
-	defer cancel()
 
 	ipfsNode, err := core.Resolve(ctx, i.node, path.Path(urlPath))
 	if err != nil {
