@@ -66,7 +66,7 @@ Resolve the value of another name:
 		resolver = n.Namesys
 		if local, _, _ := req.Option("local").Bool(); local {
 			offroute := offline.NewOfflineRouter(n.Repo.Datastore(), n.PrivateKey)
-			resolver = namesys.NewRoutingResolver(offroute)
+			resolver = namesys.NewRoutingResolver(offroute, 0)
 		}
 
 		var name string

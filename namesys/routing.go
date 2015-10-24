@@ -24,13 +24,14 @@ type routingResolver struct {
 
 	cache     map[string]cacheEntry
 	cachelock sync.Mutex
+	cachelife time.Duration
 }
 
 func (r *routingResolver) cacheGet(name string) (path.Path, bool) {
 	r.cachelock.Lock()
 	entry, ok := r.cache[name]
 	r.cachelock.Unlock()
-	if ok && time.Now().Sub(entry.recvd) < IpnsCacheLife {
+	if ok && time.Now().Sub(entry.recvd) < r.cachelife {
 		return entry.val, true
 	}
 
@@ -46,8 +47,6 @@ func (r *routingResolver) cacheSet(name string, val path.Path) {
 	r.cachelock.Unlock()
 }
 
-var IpnsCacheLife = time.Minute
-
 type cacheEntry struct {
 	val   path.Path
 	recvd time.Time
@@ -55,14 +54,15 @@ type cacheEntry struct {
 
 // NewRoutingResolver constructs a name resolver using the IPFS Routing system
 // to implement SFS-like naming on top.
-func NewRoutingResolver(route routing.IpfsRouting) *routingResolver {
+func NewRoutingResolver(route routing.IpfsRouting, cachelife time.Duration) *routingResolver {
 	if route == nil {
 		panic("attempt to create resolver with nil routing system")
 	}
 
 	return &routingResolver{
-		routing: route,
-		cache:   make(map[string]cacheEntry),
+		routing:   route,
+		cache:     make(map[string]cacheEntry),
+		cachelife: cachelife,
 	}
 }
 

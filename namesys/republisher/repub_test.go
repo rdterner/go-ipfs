@@ -19,7 +19,6 @@ import (
 
 func TestRepublish(t *testing.T) {
 	// set cache life to zero for testing low-period repubs
-	namesys.IpnsCacheLife = 0
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -36,6 +35,8 @@ func TestRepublish(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		nd.Namesys = namesys.NewNameSystem(nd.Routing, nd.Repo.Datastore(), 0)
 
 		nodes = append(nodes, nd)
 	}
