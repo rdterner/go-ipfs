@@ -84,7 +84,10 @@ func (dht *IpfsDHT) GetValue(ctx context.Context, key key.Key) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	vals, err := dht.GetValues(ctx, key, (KValue/2)+1)
+	// retrieve a majority of the expected record count
+	majority := (KValue / 2) + 1
+
+	vals, err := dht.GetValues(ctx, key, majority)
 	if err != nil {
 		return nil, err
 	}

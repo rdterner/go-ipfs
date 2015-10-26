@@ -8,12 +8,13 @@ import (
 	proto "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/gogo/protobuf/proto"
 	mh "github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-multihash"
 	"github.com/ipfs/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
+	logging "github.com/ipfs/go-ipfs/vendor/QmTBXYb6y2ZcJmoXVKk3pf9rzSEjbCg7tQaJW7RSuH14nv/go-log"
 
 	key "github.com/ipfs/go-ipfs/blocks/key"
 	pb "github.com/ipfs/go-ipfs/namesys/pb"
 	path "github.com/ipfs/go-ipfs/path"
 	routing "github.com/ipfs/go-ipfs/routing"
-	logging "github.com/ipfs/go-ipfs/vendor/QmTBXYb6y2ZcJmoXVKk3pf9rzSEjbCg7tQaJW7RSuH14nv/go-log"
+	u "github.com/ipfs/go-ipfs/util"
 )
 
 var log = logging.Logger("namesys")
@@ -31,25 +32,31 @@ func (r *routingResolver) cacheGet(name string) (path.Path, bool) {
 	r.cachelock.Lock()
 	entry, ok := r.cache[name]
 	r.cachelock.Unlock()
-	if ok && time.Now().Sub(entry.recvd) < r.cachelife {
+	if ok && time.Now().Before(entry.eol) {
 		return entry.val, true
 	}
 
 	return "", false
 }
 
-func (r *routingResolver) cacheSet(name string, val path.Path) {
+func (r *routingResolver) cacheSet(name string, val path.Path, rec *pb.IpnsEntry) {
+	cacheTil := time.Now().Add(r.cachelife)
+	eol, ok := checkEOL(rec)
+	if ok && eol.Before(cacheTil) {
+		cacheTil = eol
+	}
+
 	r.cachelock.Lock()
 	r.cache[name] = cacheEntry{
-		val:   val,
-		recvd: time.Now(),
+		val: val,
+		eol: cacheTil,
 	}
 	r.cachelock.Unlock()
 }
 
 type cacheEntry struct {
-	val   path.Path
-	recvd time.Time
+	val path.Path
+	eol time.Time
 }
 
 // NewRoutingResolver constructs a name resolver using the IPFS Routing system
@@ -133,13 +140,25 @@ func (r *routingResolver) resolveOnce(ctx context.Context, name string) (path.Pa
 		if err != nil {
 			return "", err
 		}
-		r.cacheSet(name, p)
+
+		r.cacheSet(name, p, entry)
 		return p, nil
 	} else {
 		// Its an old style multihash record
 		log.Warning("Detected old style multihash record")
 		p := path.FromKey(key.Key(valh))
-		r.cacheSet(name, p)
+		r.cacheSet(name, p, entry)
 		return p, nil
 	}
+}
+
+func checkEOL(e *pb.IpnsEntry) (time.Time, bool) {
+	if e.GetValidityType() == pb.IpnsEntry_EOL {
+		eol, err := u.ParseRFC3339(string(e.GetValidity()))
+		if err != nil {
+			return time.Time{}, false
+		}
+		return eol, true
+	}
+	return time.Time{}, false
 }
