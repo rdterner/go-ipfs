@@ -40,7 +40,16 @@ func (r *routingResolver) cacheGet(name string) (path.Path, bool) {
 }
 
 func (r *routingResolver) cacheSet(name string, val path.Path, rec *pb.IpnsEntry) {
-	cacheTil := time.Now().Add(r.cachelife)
+	ttl := r.cachelife
+	if rec.Ttl != nil {
+		// if the record has a ttl set, and its less than ours, use it instead
+		recttl := time.Duration(rec.GetTtl())
+		if recttl < ttl {
+			ttl = recttl
+		}
+	}
+
+	cacheTil := time.Now().Add(ttl)
 	eol, ok := checkEOL(rec)
 	if ok && eol.Before(cacheTil) {
 		cacheTil = eol
