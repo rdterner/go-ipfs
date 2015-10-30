@@ -5,9 +5,9 @@ import (
 	"io"
 	"testing"
 
-	logging "github.com/ipfs/go-ipfs/vendor/QmTBXYb6y2ZcJmoXVKk3pf9rzSEjbCg7tQaJW7RSuH14nv/go-log"
 	u "github.com/ipfs/go-ipfs/util"
 	testutil "github.com/ipfs/go-ipfs/util/testutil"
+	logging "github.com/ipfs/go-ipfs/vendor/QmZUcdoz4Afhc5vr3LEoPHxr1wwZfjBxxjWx2oMmfChG9W/go-log"
 
 	ic "github.com/ipfs/go-ipfs/p2p/crypto"
 	peer "github.com/ipfs/go-ipfs/p2p/peer"

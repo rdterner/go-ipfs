@@ -16,8 +16,8 @@ import (
 	protocol "github.com/ipfs/go-ipfs/p2p/protocol"
 	pb "github.com/ipfs/go-ipfs/p2p/protocol/identify/pb"
 	config "github.com/ipfs/go-ipfs/repo/config"
-	logging "github.com/ipfs/go-ipfs/vendor/QmTBXYb6y2ZcJmoXVKk3pf9rzSEjbCg7tQaJW7RSuH14nv/go-log"
 	lgbl "github.com/ipfs/go-ipfs/util/eventlog/loggables"
+	logging "github.com/ipfs/go-ipfs/vendor/QmZUcdoz4Afhc5vr3LEoPHxr1wwZfjBxxjWx2oMmfChG9W/go-log"
 )
 
 var log = logging.Logger("net/identify")
